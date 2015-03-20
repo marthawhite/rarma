@@ -1,6 +1,6 @@
 classdef RarmaSolvers
-%% Class implementing many of the optimizers required for
-%% regularized ARMA
+% Class implementing many of the optimizers required for
+% regularized ARMA
 
     properties(Constant)
         SUCCESS = 0; 
@@ -109,7 +109,7 @@ classdef RarmaSolvers
             
         end
 
-        function [R] = invhessmult(V,Y,S,Rho,H0,inds,m)
+        function R = invhessmult(V,Y,S,Rho,H0,inds,m)
         % implicit multiplication of V by limited memory inverse Hessian approximation
 
             [t,n] = size(V);
@@ -165,3 +165,5 @@ classdef RarmaSolvers
 
             end
         end
+    end
+end

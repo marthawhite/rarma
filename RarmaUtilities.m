@@ -11,11 +11,11 @@ classdef RarmaUtilities
         % Note: copies fields from DEFAULTS deep into sub-struct in opts.
         %
         % Author: Martha White, University of Alberta, 2012
-            
+ 
             if isempty(opts)
                 opts = DEFAULTS;
             else
-		opts = copyFields(opts, DEFAULTS);
+        		opts = copyFields(opts, DEFAULTS);
             end
             
             function opts = copyFields(opts, DEFAULTS)

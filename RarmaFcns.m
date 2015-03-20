@@ -8,8 +8,8 @@ classdef RarmaFcns
 % Always start from the back first, and goes backwards numsamples
 % Xminusone = [X1 ... X_t-1], samples as columns
     
-    methods(Static)
-        
+methods(Static)
+
 %%%%%%%%%%%%%%%%%%%%%%%%% RARMA BASIC MODEL COMPUTATIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 function result = computeARMA(A, Xminusone, B, Epsilon, ardim, madim, xdim, numsamples)
@@ -23,14 +23,14 @@ function result = computeAR(A, Xminusone, ardim, xdim, numsamples)
 % if numsamples is less than full matrix, then returns the last
 % numsamples of the array
     
-% Treat numsamples = 1 specially; for others, inefficiently
-% computes the entire AR and then returns a subset
-    if numsamples == 1
-        result = A * Xminusone(:,end-ardim+1);
-        return;
-    end
+% % Treat numsamples = 1 specially; for others, inefficiently
+% % computes the entire AR and then returns a subset
+%     if numsamples == 1
+%         result = A * Xminusone(:,end-ardim+1);
+%         return;
+%     end
     
-    Xhist = generate_history(Xminusone, ardim);
+    Xhist = RarmaFcns.generate_history(Xminusone, ardim);
     result = A*Xhist;
     result = [zeros(xdim, ardim) result];
     if numsamples < size(result,2), result = result(:, end-numsamples+1:end); end
@@ -161,15 +161,13 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%% RARMA LOSS FUNCTIONS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-
 function [f,g] = euclidean_rarma(X, A, B, Epsilon, var)
 % EUCLIDEAN_RARMA implements the euclidean loss
 % See genericloss_rarma below for a description of the parameters
 
-    lossfcnar = @euclidean_loss_ar;
-    lossfcnma = @euclidean_loss_ma;
-    
-    [f,g] = genericloss_rarma(X, A, B, Epsilon, var, lossfcnar, lossfcnma);
+    lossType = 'euclidean';
+
+    [f,g] = RarmaFcns.genericloss_rarma(X, A, B, Epsilon, var, lossType);
 end
 
 function [f,g] = robust_rarma(X, A, B, Epsilon, var)
@@ -177,13 +175,12 @@ function [f,g] = robust_rarma(X, A, B, Epsilon, var)
 % See genericloss_rarma below for a description of the parameters
 
     sigma = 1;
-    lossfcnar = @(diff)(robust_loss_ar(diff,sigma));
-    lossfcnma = @(diff)(robust_loss_ma(diff,sigma));
+    lossType = 'robust';
     
-    [f,g] = genericloss_rarma(X, A, B, Epsilon, var, lossfcnar, lossfcnma);
+    [f,g] = RarmaFcns.genericloss_rarma(X, A, B, Epsilon, var, lossType, sigma);
 end
 
-function [f,g] = genericloss_rarma(X, A, B, Epsilon, var, lossfcnar, lossfcnma)
+function [f,g] = genericloss_rarma(X, A, B, Epsilon, var, lossType, param)
 % If Epsilon empty, then B = Z
 % Ignores the first ardim parts of X in the loss
 % EITHER:
@@ -200,7 +197,7 @@ function [f,g] = genericloss_rarma(X, A, B, Epsilon, var, lossfcnar, lossfcnma)
 % B = [B^(1); B^(2); ... ; B^(q)];  n*q x latent_dim
 % Epsilon = [Epsilon_{:,1} Epsilon_{:, 2} ... Epsilon_{:, t}];  latent_dim x t
 % Z = [Z^(1); Z^(2); ... ; Z^(q)] = [B^(1) Epsilon; B^(2) Epsilon; ... ; B^(q) Epsilon];  n*q x t
-    
+
 % When nargin == 5, var says for which variable to return gradient
 % var = 1 means gradient in A
 % var = 2 means gradient in Z
@@ -212,6 +209,18 @@ function [f,g] = genericloss_rarma(X, A, B, Epsilon, var, lossfcnar, lossfcnma)
     madim = size(B, 1)/xdim;
     r = max(ardim, madim-1); % this is because phi_t and x_t always in the same spot
     numsamples = size(X,2);
+    
+    switch lossType
+        case 'euclidean'
+            lossfcnar = @euclidean_loss_ar;
+            lossfcnma = @euclidean_loss_ma;
+        case 'robust'
+            lossfcnar = @robust_loss_ar;
+            lossfcnma = @robust_loss_ma;
+            sigma = param;
+        otherwise
+            error('Unknown RARMA loss type!');
+    end
     
     % Now A is the variable; A = [A^(1) ...  A^(p)]
     % where A^(i) is n x n
@@ -225,7 +234,7 @@ function [f,g] = genericloss_rarma(X, A, B, Epsilon, var, lossfcnar, lossfcnma)
         F(:,1:r) = 0;
         
         diff = F - X_modified;
-        [f,g] = lossfcnar(diff);
+        [f,g] = lossfcnar();
 
         % Now Z is the variable
     elseif var == 2
@@ -237,7 +246,7 @@ function [f,g] = genericloss_rarma(X, A, B, Epsilon, var, lossfcnar, lossfcnma)
         F(:,1:r) = 0;
         
         diff = F - X_modified;
-        [f,g] = lossfcnma(diff);
+        [f,g] = lossfcnma();
 
         % Now B is the variable
     elseif var == 3
@@ -249,7 +258,7 @@ function [f,g] = genericloss_rarma(X, A, B, Epsilon, var, lossfcnar, lossfcnma)
         F(:,1:r) = 0;
         diff = F - X_modified;
         
-        [f,g] = lossfcnma(diff);
+        [f,g] = lossfcnma();
         g = g*Epsilon';
         
         % Now Epsilon is the variable
@@ -262,7 +271,7 @@ function [f,g] = genericloss_rarma(X, A, B, Epsilon, var, lossfcnar, lossfcnma)
         F(:,1:r) = 0;
         diff = F - X_modified;
         
-        [f,g] = lossfcnma(diff);
+        [f,g] = lossfcnma();
         g = B'*g;   
         
     else
@@ -271,48 +280,49 @@ function [f,g] = genericloss_rarma(X, A, B, Epsilon, var, lossfcnar, lossfcnma)
     
     f = f / numsamples;
     g = g ./ numsamples;
-end
 
-function [f,g] = euclidean_loss_ar(diff)
-    f = (0.5) * sum(sum(diff.^2));
-    Xhist = [zeros(xdim*ardim, ardim) generate_history(X(:,1:end-1),ardim)];
-    g = diff * Xhist';
-end
-
-function [f,g] = euclidean_loss_ma(diff)
-    f = (0.5) * sum(sum(diff.^2));
-    T = size(diff, 2);
-    g = zeros(xdim*madim, T);
-    for j = 1:madim
-        idx = RarmaFcns.blockInd(j,xdim);
-        g(idx,1:T-j+1) = diff(:,j:T);
+    function [f,g] = euclidean_loss_ar
+        f = (0.5) * sum(sum(diff.^2));
+        Xhist = [zeros(xdim*ardim, ardim) RarmaFcns.generate_history(X(:,1:end-1),ardim)];
+        g = diff * Xhist';
     end
-end
 
-function [f,g] = robust_loss_ar(diff,sigma)
-    idx = abs(diff) < sigma;
-    Z = abs(diff) - (sigma/2);
-    Z(idx) = diff(idx).^2 * (0.5/sigma);      
-    f = sum(sum(Z));   
-    Xhist = [zeros(xdim*ardim, ardim) generate_history(X(:,1:end-1),ardim)];        
-    g = sign(diff);
-    g(idx) = diff(idx)/sigma;
-    g = g * Xhist';
-end
-
-function [f,g] = robust_loss_ma(diff,sigma)
-    idx = abs(diff) < sigma;
-    Z = abs(diff) - (sigma/2);
-    Z(idx) = diff(idx).^2 * (0.5/sigma);
-    f = sum(sum(Z));
-    gg = sign(diff);
-    gg(idx) = diff(idx)/sigma;
-    T = size(gg, 2);
-    g = zeros(xdim*madim, T);
-    for j = 1:madim
-        idx = RarmaFcns.blockInd(j,xdim);
-        g(idx,1:T-j+1) = gg(:,j:T);
+    function [f,g] = euclidean_loss_ma
+        f = (0.5) * sum(sum(diff.^2));
+        T = size(diff, 2);
+        g = zeros(xdim*madim, T);
+        for j = 1:madim
+            idx = RarmaFcns.blockInd(j,xdim);
+            g(idx,1:T-j+1) = diff(:,j:T);
+        end
     end
+
+    function [f,g] = robust_loss_ar
+        idx = abs(diff) < sigma;
+        Z = abs(diff) - (sigma/2);
+        Z(idx) = diff(idx).^2 * (0.5/sigma);      
+        f = sum(sum(Z));
+        Xhist = [zeros(xdim*ardim, ardim) RarmaFcns.generate_history(X(:,1:end-1),ardim)];
+        g = sign(diff);
+        g(idx) = diff(idx)/sigma;
+        g = g * Xhist';
+    end
+
+    function [f,g] = robust_loss_ma
+        idx = abs(diff) < sigma;
+        Z = abs(diff) - (sigma/2);
+        Z(idx) = diff(idx).^2 * (0.5/sigma);
+        f = sum(sum(Z));
+        gg = sign(diff);
+        gg(idx) = diff(idx)/sigma;
+        T = size(gg, 2);
+        g = zeros(xdim*madim, T);
+        for j = 1:madim
+            idx = RarmaFcns.blockInd(j,xdim);
+            g(idx,1:T-j+1) = gg(:,j:T);
+        end
+    end
+    
 end
 
 function [val, G] = trace_norm(A) 
@@ -333,3 +343,25 @@ function [f, g] = frob_norm_sq(A)
     g = 2.*A;
 end
 
+function X_hist = generate_history(Xminusone, ardim)
+% create a matrix where each column is vectorized last ardim samples
+% X_hist = [[X_ardim; X_ardim-1;...;X_1 ] ... [X_t-1; X_t-2;...;X_t-ardim ]]   
+% X_hist is n*ardim x t-ardim
+% X is n x t-1
+  
+  tminusone = size(Xminusone, 2);
+  X_hist = [];
+  for i = 1:ardim
+    X_hist = [X_hist; Xminusone(:,(ardim-i+1):(tminusone-i+1))];
+  end
+  
+  %for i = ardim:tminusone
+  %  x_iplusone = Xminusone(:,i:-1:(i-ardim+1));
+  %  X_hist = [X_hist x_iplusone(:)];
+  %end
+end
+
+% END OF METHODS
+end    
+% END OF CLASSDEF
+end

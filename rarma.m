@@ -1,5 +1,5 @@
 function [model, obj] = rarma(X, opts)
-    %% Using global convex approach to solve regularized ARMA (RARMA)
+%% Using global convex approach to solve regularized ARMA (RARMA)
 % Solves the optimization
 % min_{A, B, Epsilon} sum_{t=1}^T L(sum_{i=1}^p A^(i) X_{t-i} + sum_{j=0}^q B^(j) Epsilon_{t-i})
 % 	     	      		  		      	      + alpha || B ||^2_{F} + alpha || Epsilon ||^2_{F}
@@ -16,14 +16,12 @@ function [model, obj] = rarma(X, opts)
 %          Martha White (Indiana University) 
 %          Released: March 2015
 
-
 if nargin < 1
   error('rarma requires at least data matrix X = [X1, ..., XT]');
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% DEFAULT PARAMETERS STARTS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-DEFAULTS.optimizer = @(lossfcn, xinit)(RarmaSolvers.fmin_LBFGS(lossfcn, xinit, struct('maxiter', 1000)));   
+DEFAULTS.optimizer = @(lossfcn, xinit)(RarmaSolvers.fmin_LBFGS(lossfcn, xinit, struct('maxiter', 1000)));
 DEFAULTS.ardim = 5;
 DEFAULTS.init_stepsize = 10;
 DEFAULTS.Loss = @RarmaFcns.euclidean_rarma; 
@@ -60,7 +58,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%% START OPTIMIZATION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Initialize variables for learning
-[xdim numsamples] = size(X);
+[xdim, numsamples] = size(X);
 sizeA = [xdim, xdim*opts.ardim];
 Ainit = initAParams(sizeA);
 sizeZ = [xdim*opts.madim, numsamples];
@@ -102,7 +100,8 @@ function [model,obj] = solve_rarma()
 %% SOLVE_RARMA
 % Solve for A first (with Z = 0), then iterate between Z and A
     Z = zeros(sizeZ);
-    [A, obj, iter, msg] = lbfgs(@(Avec)(objA(Avec, X, Z)), Ainit(:), opts.ar_params);
+    [A, obj, iter, msg] =...
+        RarmaSolvers.fmin_LBFGS(@(Avec)(objA(Avec, X, Z)), Ainit(:));
     A = reshape(A, sizeA);
     [Z, prev_obj] = iterateZ(Z,A);
   
@@ -154,12 +153,12 @@ end
 function [f,g] = objA(Ain, X, Z)
 %% OBJA Ain can either be a vector or matrix 
 % the gradient is returned to be of the same size
-  Amat = reshape(Avec,sizeA);
+  Amat = reshape(Ain,sizeA);
   if nargout > 1
     [f,g] = opts.Loss(X, Amat, Z, [], 1);  
     [f2,g2] = opts.reg_ar(Amat);
     g = g + opts.reg_wgt_ar*g2;
-    g = reshape(g, size(Avec));
+    g = reshape(g, size(Amat));
   else
     f = opts.Loss(X, Amat, Z, [], 1);
     f2 = opts.reg_ar(Amat);
@@ -188,7 +187,7 @@ function Aparams = initAParams(sizeA)
 % INITAPARAMS
 % Could initialize in many ways; for speed, we choose
 % a regression between X = AXhist
-  Xhist = generate_history(X(:, 1:end-1), opts.ardim);
+  Xhist = RarmaFcns.generate_history(X(:, 1:end-1), opts.ardim);
   Aparams = (Xhist' \ X(:,opts.ardim+1:end)')';
 end
 
