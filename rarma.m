@@ -25,11 +25,13 @@ DEFAULTS.optimizer = @(lossfcn, xinit)(RarmaSolvers.fmin_LBFGS(lossfcn, xinit, s
 DEFAULTS.ardim = 5;
 DEFAULTS.init_stepsize = 10;
 DEFAULTS.Loss = @RarmaFcns.euclidean_rarma; 
+DEFAULTS.maxiter = 100;
 DEFAULTS.madim = 5;
 DEFAULTS.recover = 1;  % Recover B and Epsilon from learned Z
 DEFAULTS.reg_ar = @RarmaFcns.frob_norm_sq;
 DEFAULTS.reg_wgt_ar = 1e-2;
 DEFAULTS.reg_wgt_ma = 1e-1;
+DEFAULTS.TOL = 1e-6;
 DEFAULTS.verbose = 0 ; % 0: nothing
                        % 1: output at start and end of optimization
                        % 2: optimization feedback along the way
@@ -142,8 +144,8 @@ end
 function [B, Epsilon] = recoverModels(Z)
       [Usvd,Sigma,V] = svd(Z, 'econ');
       sqrtSigma = sqrt(Sigma);
-      model.B = Usvd * sqrtSigma;
-      model.Epsilon = sqrtSigma * V';
+      B = Usvd * sqrtSigma;
+      Epsilon = sqrtSigma * V';
 end
 
 
@@ -158,7 +160,7 @@ function [f,g] = objA(Ain, X, Z)
     [f,g] = opts.Loss(X, Amat, Z, [], 1);  
     [f2,g2] = opts.reg_ar(Amat);
     g = g + opts.reg_wgt_ar*g2;
-    g = reshape(g, size(Amat));
+    g = reshape(g, size(Ain));
   else
     f = opts.Loss(X, Amat, Z, [], 1);
     f2 = opts.reg_ar(Amat);
@@ -173,10 +175,10 @@ function [f,g] = objZ(Zin, A)
   Zmat = reshape(Zin,sizeZ);
   if nargout < 2
     f = opts.Loss(X, A, Zmat, [], 2);
-    f2 = trace_norm(Zmat);
+    f2 = RarmaFcns.trace_norm(Zmat);
   else
     [f, g] = opts.Loss(X, A, Zmat, [], 2);
-    [f2, g2] = trace_norm(Zmat);
+    [f2, g2] = RarmaFcns.trace_norm(Zmat);
     g = g + opts.reg_wgt_ma * g2;
     g = reshape(g, size(Zin));    
   end

@@ -74,11 +74,12 @@ classdef RarmaSolvers
             for iter = 1:opts.maxiter
                 % compute search direction
                 dir = RarmaSolvers.invhessmult(-g,Y,S,Rho,H0,inds,opts.m);
-                slope = d'*g;
+                slope = dir'*g;
                 if -slope < opts.funTol, break; end
 
-                [xnew,fnew,flag,gnew] = RarmaSolvers.backtrack(fun,x,f,dir,slope,opts);
+                [xnew,flag] = RarmaSolvers.backtrack(fun,x,f,dir,slope,opts);
                 if flag ~= RarmaSolvers.SUCCESS, break; end
+                [fnew,gnew] = fun(xnew);
                 
                 % update memory for estimating inverse Hessian
                 s = xnew - x;
@@ -131,38 +132,39 @@ classdef RarmaSolvers
                 Beta = Rho(i)*Y(:,i)'*R;
                 R = R + S(:,i)*(Alpha(i,:)-Beta);
             end
+        end
+        
 
-            function [x,f,flag,g] = backtrack(fun,x0,f0,dir,slope,opts)
-            % backtrack line search, using more info then above linesearch 
+        function [x,flag] = backtrack(fun,x0,f0,dir,slope,opts)
+        % backtrack line search, using more info then above linesearch 
 
-                flag = RarmaSolvers.SUCCESS;
+            flag = RarmaSolvers.SUCCESS;
 
-                if any(imag(x0)), x=x0;f=f0;g=-dir;flag=RarmaSolvers.ERROR_BACKTRACK;return, end;
-                if any(imag(f0)), x=x0;f=f0;g=-dir;flag=RarmaSolvers.ERROR_BACKTRACK;return, end;
-                if any(imag(dir)), x=x0;f=f0;g=-dir;flag=RarmaSolvers.ERROR_BACKTRACK;return, end;
+            if any(imag(x0)), x=x0;f=f0;g=-dir;flag=RarmaSolvers.ERROR_BACKTRACK;return, end;
+            if any(imag(f0)), x=x0;f=f0;g=-dir;flag=RarmaSolvers.ERROR_BACKTRACK;return, end;
+            if any(imag(dir)), x=x0;f=f0;g=-dir;flag=RarmaSolvers.ERROR_BACKTRACK;return, end;
 
-                % backtrack
-                alpha = opts.backtrack_init_stepsize;
-                for iter = 1:opts.backtrack_maxiter
+            % backtrack
+            alpha = opts.backtrack_init_stepsize;
+            for iter = 1:opts.backtrack_maxiter
 
-                    x = x0 + alpha*dir;
+                x = x0 + alpha*dir;
 
-                    f = fun(x);
-                    if imag(f) 
-                        alpha = alpha*opts.backtrack_backoff;
-                        continue
-                    end
-                    
-                    if f < f0 || f < f0 + opts.backtrack_acceptfrac*alpha*slope 
-                        break; 
-                    end
+                f = fun(x);
+                if imag(f) 
                     alpha = alpha*opts.backtrack_backoff;
+                    continue
                 end
-
-                if iter == opts.backtrack_maxiter
-                    flag = RarmaSolvers.ERROR_BACKTRACK_MAXITER;
+                
+                if f < f0 || f < f0 + opts.backtrack_acceptfrac*alpha*slope 
+                    break; 
                 end
+                alpha = alpha*opts.backtrack_backoff;
+            end
 
+            if iter == opts.backtrack_maxiter
+                x = x0;
+                flag = RarmaSolvers.ERROR_BACKTRACK_MAXITER;
             end
         end
     end
