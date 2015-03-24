@@ -42,10 +42,19 @@ function result = computeMA(B, Epsilon, madim, xdim, numsamples)
         % Does not use Z^(j)_{:, T-madim+j+1:T} 
         result = zeros(xdim, numsamples);
         T = size(B,2);
+%         % JF: not working. This is a bug I never noticed, because at a
+%         time, we decided that the prediction (in
+%         convex_multi_view_model.m, line 300) should not use the "noise"
+%         for future prediction.
+%         for j = 1:madim
+%             idx = RarmaFcns.blockInd(j,xdim);
+%             Tidx = T:-1:max(T-numsamples+1,j);
+%             result(:,Tidx) = result(:,Tidx) + B(idx, Tidx-j+1);           
+%         end
         for j = 1:madim
             idx = RarmaFcns.blockInd(j,xdim);
-            Tidx = T:-1:max(T-numsamples+1,j);
-            result(:,Tidx) = result(:,Tidx) + B(idx, Tidx-j+1);           
+            Tidx = numsamples:-1:max(1,numsamples-T+j);
+            result(:,Tidx) = result(:,Tidx) + B(idx, Tidx-numsamples+T-j+1);
         end
     else
         result = zeros(xdim, numsamples);
@@ -94,7 +103,6 @@ function ind = blockInd(j, xdim)
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%% Prediction Functions %%%%%%%%%%%%%%%%%%%%%%%%%%
-
 % Model contains 
 % model.Aall, model.B, model.z and model.zparam for the exponential scalar variable
 % Phistart = [Phi_1, ..., Phi_startnum]
@@ -107,7 +115,7 @@ function Xiterated = iterate_predict(Xstart, Epsilonstart, model, horizon, opts)
 % Epsilonstart can either be Zstart or the epsilon; this is
 % determined by the size of the matrix
     
-    if isempty(Phistart) 
+    if isempty(Epsilonstart) 
         Xiterated = iterate_predict_ar(Xstart, model, horizon, opts);
         return;
     end
@@ -120,12 +128,12 @@ function Xiterated = iterate_predict(Xstart, Epsilonstart, model, horizon, opts)
     else  
         Xminusone = Xstart(:, (end-r+1):end);
     end  
-    Zq = Phistart(:, (end-opts.madim+1):end);
+    Zq = Epsilonstart(:, (end-opts.madim+1):end);
     if size(Zq, 1) ~= opts.madim*xdim
         if isempty(model.B)
-            Zq = zeros(opts.madim*xdim, size(Xstart,2))
+            Zq = zeros(opts.madim*xdim, size(Xstart,2));
         else    
-            Zq = model.B*Phistart(:, (end-opts.madim+1):end);
+            Zq = model.B*Epsilonstart(:, (end-opts.madim+1):end);
         end
     end
     
@@ -147,6 +155,7 @@ function Xiterated = iterate_predict_ar(Xstart, model, horizon, opts)
 % If Phistart is empty, then compute it before proceeding
 % The predicted phi will use a generative Laplace model
     
+    xdim = size(Xstart, 1);
     Xminusone = Xstart(:, (end-opts.ardim+1):end);
     xt = RarmaFcns.computeAR(model.A, Xminusone, opts.ardim, xdim, 1);
     Xiterated = xt;

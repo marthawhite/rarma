@@ -126,7 +126,8 @@ function [model,obj] = solve_rarma()
   if opts.recover == 1
       [model.B, model.Epsilon] = recoverModels(Z);
   end
-  model.predict = @(Xstart, Phistart, horizon, opts)(RarmaFcns.iterate_predict(Xstart, model, horizon, opts));    
+%   model.predict = @(Xstart, Epsilonstart, horizon, opts)(RarmaFcns.iterate_predict(Xstart, Epsilonstart, model, horizon, opts));
+  model.predict = @(Xstart, horizon, opts)(RarmaFcns.iterate_predict_ar(Xstart, model, horizon, opts));
 end
 
 function [A, f] = iterateA(A, Z)

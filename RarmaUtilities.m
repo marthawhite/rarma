@@ -31,7 +31,27 @@ classdef RarmaUtilities
                     end
                 end
             end
-
         end
+        
+        function [isStable, eigs] = checkStable(A, threshold)
+        % This function check whether a model is stable based on the
+        % eigenvalues of A
+            if nargin < 2
+                threshold = 1.0;
+            end
+            [xdim, tmp] = size(A);
+            ardim = round(tmp/xdim);
+            bigA = A;
+            if ardim < 1
+                error('ardim < 1');
+            elseif ardim ~= 1
+                bigA = [bigA; eye((ardim-1)*xdim),...
+                    zeros((ardim-1)*xdim,xdim)];
+            end
+            eigs = abs(eig(bigA));
+            maxEig = max(eigs); % should be <=1
+            isStable = (maxEig<=threshold);
+        end
+        
     end
 end
