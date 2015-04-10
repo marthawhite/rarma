@@ -22,6 +22,8 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% DEFAULT PARAMETERS STARTS %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 DEFAULTS.optimizer = @(lossfcn, xinit)(RarmaSolvers.fmin_LBFGS(lossfcn, xinit, struct('maxiter', 1000)));
+%options = optimoptions(@fminunc,'GradObj','on')
+%DEFAULTS.optimizer = @(lossfcn, xinit)(fminunc(lossfcn, xinit, options));
 DEFAULTS.ardim = 5;
 DEFAULTS.init_stepsize = 10;
 DEFAULTS.Loss = @RarmaFcns.euclidean_rarma; 
@@ -77,9 +79,9 @@ model = [];
 function [model,obj] = solve_ar()
 %% SOLVE_AR
 % Solve only for A, since q = 0
-  [A, obj, iter, msg] = RarmaSolvers.lbfgs(@(Avec)(objA(Avec, X, [])), Ainit(:), opts.ar_params);
+  [A, obj, iter, msg] = opts.optimizer(@(Avec)(objA(Avec, X, [])), Ainit(:));
   model.A = reshape(A, sizeA);
-  model.predict = @(Xstart, Phistart, horizon, opts)(RarmaFcns.iterate_predict_ar(Xstart, model, horizon, opts));  
+  model.predict = @(Xstart, horizon, opts)(RarmaFcns.iterate_predict_ar(Xstart, model, horizon, opts));  
 end
 
 function [model,obj] = solve_ma()
@@ -88,13 +90,14 @@ function [model,obj] = solve_ma()
 % Note: the code is currently not well-designed to do long-horizon prediction
 % with only a moving average models, since future moving average
 % components are not imputed; should work, however, for 1-step prediction
-  [Z, obj, iter, msg] = RarmaSolvers.lbfgs(@(Zvec)(objZ(Zvec, zeros(sizeA))), zeros(sizeZ), opts.ar_params);
+  [Z, obj, iter, msg] = opts.optimizer(@(Zvec)(objZ(Zvec, zeros(sizeA))), zeros(sizeZ));
   model.Z = reshape(Z, sizeZ);
   model.A = zeros(sizeA);
   if opts.recover == 1
       [model.B, model.Epsilon] = recoverModels(Z);
   end  
-  model.predict = @(Xstart, Phistart, horizon, opts)(RarmaFcns.iterate_predict(Xstart, model, horizon, opts));  
+  model.predict = @(Xstart, horizon, ...
+                    opts)(RarmaFcns.iterate_predict(Xstart, [], model, horizon, opts));  
 end
 
 
@@ -102,8 +105,7 @@ function [model,obj] = solve_rarma()
 %% SOLVE_RARMA
 % Solve for A first (with Z = 0), then iterate between Z and A
     Z = zeros(sizeZ);
-    [A, obj, iter, msg] =...
-        RarmaSolvers.fmin_LBFGS(@(Avec)(objA(Avec, X, Z)), Ainit(:));
+    [A, obj, iter, msg] =opts.optimizer(@(Avec)(objA(Avec, X, Z)), Ainit(:));
     A = reshape(A, sizeA);
     [Z, prev_obj] = iterateZ(Z,A);
   
@@ -170,7 +172,7 @@ function [f,g] = objA(Ain, X, Z)
   f = f + opts.reg_wgt_ar*f2;
 end
 
-% Need to linearize for LBFGS
+% Need to linearize for LBFGS or fminunc
 function [f,g] = objZ(Zin, A)
 %% OBJZ Zin can either be a vector or matrix 
 % the gradient is returned to be of the same size    

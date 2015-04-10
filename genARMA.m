@@ -8,7 +8,7 @@ DEFAULTS.madim = 2; % q, lag of MA
 DEFAULTS.tau = 0.5; % noise level of MA component
 DEFAULTS.num_reps = 1; % number of time series generated
 DEFAULTS.num_trainsamples = 100; % number of training points
-DEFAULTS.num_testsamples = 100; % number of test points
+DEFAULTS.num_testsamples = 10; % number of test points
 
 if nargin < 1
     opts = DEFAULTS;

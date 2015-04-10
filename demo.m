@@ -2,7 +2,7 @@ clear
 clc
 
 rng(100);
-num_reps = 2;
+num_reps = 10;
 Models = cell(num_reps,1);
 Xpredictall = cell(num_reps,1);
 Err = zeros(num_reps,1);
@@ -29,5 +29,7 @@ end
 for ii = 1:num_reps
     Xpredictall{ii} = Models{ii}.predict(Xtrainall{ii},...
         size(Xtestall{ii},2), opts);
-    Err(ii) = sum(sum((Xpredictall{ii}-Xtestall{ii}).^2));
+    Err(ii) = sum(sum((Xpredictall{ii}-Xtestall{ii}).^2))/size(Xtestall{ii},2);
 end
+
+Err
