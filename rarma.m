@@ -27,7 +27,7 @@ DEFAULTS.optimizer = @(lossfcn, xinit)(RarmaSolvers.fmin_LBFGS(lossfcn, xinit, s
 DEFAULTS.ardim = 5;
 DEFAULTS.init_stepsize = 10;
 DEFAULTS.Loss = @RarmaFcns.euclidean_rarma; 
-DEFAULTS.maxiter = 100;
+DEFAULTS.maxiter = 1000;
 DEFAULTS.madim = 5;
 DEFAULTS.recover = 1;  % Recover B and Epsilon from learned Z
 DEFAULTS.reg_ar = @RarmaFcns.frob_norm_sq;
@@ -107,14 +107,14 @@ function [model,obj] = solve_rarma()
     Z = zeros(sizeZ);
     [A, obj, iter, msg] =opts.optimizer(@(Avec)(objA(Avec, X, Z)), Ainit(:));
     A = reshape(A, sizeA);
-    [Z, prev_obj] = iterateZ(Z,A);
+    [Z, prev_obj] = iterateZ(Z,A,opts.init_stepsize);
   
   for i = 1:opts.maxiter
     % Do A first since it returns the incorrect obj
-    A = iterateA(A,Z);
-    [Z, obj] = iterateZ(Z,A);
+    A = iterateA(A,Z,opts.init_stepsize/i); % adaptive stepsize
+    [Z, obj] = iterateZ(Z,A,opts.init_stepsize/i);
     
-    if abs(obj-prev_obj) < opts.TOL
+    if abs(prev_obj-obj) < opts.TOL % doing minimization
       break; 
     end
     prev_obj = obj;
@@ -133,15 +133,15 @@ function [model,obj] = solve_rarma()
   model.predict = @(Xstart, horizon, opts)(RarmaFcns.iterate_predict_ar(Xstart, model, horizon, opts));
 end
 
-function [A, f] = iterateA(A, Z)
+function [A, f] = iterateA(A, Z, init_stepsize)
   [f,g] = objA(A, X, Z);
-  stepsize = RarmaSolvers.line_search(A, f, g, @(A)(objA(A, X, Z)),opts.init_stepsize);
+  stepsize = RarmaSolvers.line_search(A, f, g, @(A)(objA(A, X, Z)),init_stepsize);
   A = A - stepsize*(g);
 end
 
-function [Z, f] = iterateZ(Z, A)
+function [Z, f] = iterateZ(Z, A, init_stepsize)
   [f,g] = objZ(Z, A);
-  stepsize = RarmaSolvers.line_search(Z, f, g, @(Z)(objZ(Z, A)), opts.init_stepsize/10); 
+  stepsize = RarmaSolvers.line_search(Z, f, g, @(Z)(objZ(Z, A)), init_stepsize); 
   Z = Z - stepsize*g;
 end
 

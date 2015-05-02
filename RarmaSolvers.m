@@ -3,10 +3,10 @@ classdef RarmaSolvers
 % regularized ARMA
 
     properties(Constant)
-        SUCCESS = 0; 
-        ERROR_MAXITER = 10; 
-        ERROR_BACKTRACK = 20; 
-        ERROR_BACKTRACK_MAXITER = 21        
+        SUCCESS = 0;
+        ERROR_MAXITER = 10;
+        ERROR_BACKTRACK = 20;
+        ERROR_BACKTRACK_MAXITER = 21;
     end
     
     methods(Static)
@@ -16,7 +16,7 @@ classdef RarmaSolvers
         % x0 can be a matrix
             
             backtrack_backoff = 0.5;
-            backtrack_maxiter = 10;
+            backtrack_maxiter = 100; % make this large to ensure descend
 
             for iter = 1:backtrack_maxiter
 
@@ -38,8 +38,8 @@ classdef RarmaSolvers
             
             if ~isa(fun,'function_handle'), error('fmin_LBFGS -> improper function handle'); end
 
-            DEFAULTS.curvTol = 1e-3;            
-            DEFAULTS.funTol = 1e-6;   
+            DEFAULTS.curvTol = 1e-6;  % for curvature condition
+            DEFAULTS.funTol = 1e-6;
             DEFAULTS.m = 50;          % number gradients in bundle
             DEFAULTS.maxiter = 1000;   
             DEFAULTS.verbose = 0;
@@ -58,7 +58,7 @@ classdef RarmaSolvers
                 opts = RarmaUtilities.getOptions(opts, DEFAULTS);
             end
 
-            x = x0;   
+            x = x0;
             flag = RarmaSolvers.SUCCESS;
 
             t = length(x0);
@@ -70,7 +70,7 @@ classdef RarmaSolvers
             slope = Inf;
 
             % damped limited memory BFGS method
-            [f,g] = fun(x);  
+            [f,g] = fun(x);
             for iter = 1:opts.maxiter
                 % compute search direction
                 dir = RarmaSolvers.invhessmult(-g,Y,S,Rho,H0,inds,opts.m);
@@ -85,7 +85,7 @@ classdef RarmaSolvers
                 s = xnew - x;
                 y = gnew - g;
                 curvature = y'*s;
-                if curvature > opts.curvTol	
+                if curvature > opts.curvTol
                     rho = 1/curvature;
                     if length(inds) < opts.m
                         i = length(inds)+1;
