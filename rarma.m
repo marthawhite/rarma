@@ -14,7 +14,7 @@ function [model, obj] = rarma(X, opts)
 %
 % Authors: Junfeng Wen (University of Alberta)
 %          Martha White (Indiana University) 
-%          Released: March 2015
+%          Last Update: Nov 2015
 
 if nargin < 1
   error('rarma requires at least data matrix X = [X1, ..., XT]');
@@ -46,6 +46,11 @@ else
   opts = RarmaUtilities.getOptions(opts, DEFAULTS);
 end
 
+% Validity check
+if opts.madim < 0 || opts.ardim < 0
+  error('Incorrect parameters');
+end
+
 % Solve for RARMA, AR or MA dependning on madim and ardim choices
 ar_solver = @solve_rarma;
 if opts.madim < 1
@@ -64,8 +69,13 @@ end
 % Initialize variables for learning
 [xdim, numsamples] = size(X);
 sizeA = [xdim, xdim*opts.ardim];
-Ainit = initAParams(sizeA);
 sizeZ = [xdim*opts.madim, numsamples];
+if opts.ardim > 0
+  Ainit = initAParams();
+end
+if opts.madim > 0
+  Zinit = zeros(sizeZ);
+end
 
 % START the outer optimization; save any learned variables in model along the way
 model = [];
@@ -90,32 +100,32 @@ function [model,obj] = solve_ma()
 % Note: the code is currently not well-designed to do long-horizon prediction
 % with only a moving average models, since future moving average
 % components are not imputed; should work, however, for 1-step prediction
-  [Z, obj, iter, msg] = opts.optimizer(@(Zvec)(objZ(Zvec, zeros(sizeA))), zeros(sizeZ));
+  [Z, obj, iter, msg] = opts.optimizer(@(Zvec)(objZ(Zvec, zeros(sizeA))), Zinit(:));
   model.Z = reshape(Z, sizeZ);
   model.A = zeros(sizeA);
   if opts.recover == 1
       [model.B, model.Epsilon] = recoverModels(Z);
-  end  
-  model.predict = @(Xstart, horizon, ...
-                    opts)(RarmaFcns.iterate_predict(Xstart, [], model, horizon, opts));  
+  end
+  % Cannot really 'predict' without autoregressive component
+  model.predict = @(Xstart, horizon, opts)...
+      (RarmaFcns.iterate_predict(Xstart, [], model, horizon, opts));
 end
 
 
 function [model,obj] = solve_rarma()
 %% SOLVE_RARMA
 % Solve for A first (with Z = 0), then iterate between Z and A
-    Z = zeros(sizeZ);
-    [A, obj, iter, msg] =opts.optimizer(@(Avec)(objA(Avec, X, Z)), Ainit(:));
+    [A, obj, iter, msg] = opts.optimizer(@(Avec)(objA(Avec, X, Zinit)), Ainit(:));
     A = reshape(A, sizeA);
-    [Z, prev_obj] = iterateZ(Z,A,opts.init_stepsize);
+    [Z, prev_obj] = iterateZ(Zinit, A, opts.init_stepsize);
   
   for i = 1:opts.maxiter
     % Do A first since it returns the incorrect obj
-    A = iterateA(A,Z,opts.init_stepsize/i); % adaptive stepsize
-    [Z, obj] = iterateZ(Z,A,opts.init_stepsize/i);
+    A = iterateA(A, Z, opts.init_stepsize/i); % adaptive stepsize
+    [Z, obj] = iterateZ(Z, A, opts.init_stepsize/i);
     
     if abs(prev_obj-obj) < opts.TOL % doing minimization
-      break; 
+      break;
     end
     prev_obj = obj;
   end
@@ -189,7 +199,7 @@ function [f,g] = objZ(Zin, A)
   f = f + opts.reg_wgt_ma * f2;
 end
 
-function Aparams = initAParams(sizeA)
+function Aparams = initAParams()
 % INITAPARAMS
 % Could initialize in many ways; for speed, we choose
 % a regression between X = AXhist

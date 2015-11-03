@@ -30,10 +30,14 @@ function result = computeAR(A, Xminusone, ardim, xdim, numsamples)
 %         return;
 %     end
     
-    Xhist = RarmaFcns.generate_history(Xminusone, ardim);
-    result = A*Xhist;
-    result = [zeros(xdim, ardim) result];
-    if numsamples < size(result,2), result = result(:, end-numsamples+1:end); end
+    if ardim > 0
+        Xhist = RarmaFcns.generate_history(Xminusone, ardim);
+        result = A*Xhist;
+        result = [zeros(xdim, ardim) result];
+        if numsamples < size(result,2), result = result(:, end-numsamples+1:end); end
+    else
+        result = zeros(xdim, numsamples);
+    end
 end
 
 function result = computeMA(B, Epsilon, madim, xdim, numsamples)
@@ -42,15 +46,7 @@ function result = computeMA(B, Epsilon, madim, xdim, numsamples)
         % Does not use Z^(j)_{:, T-madim+j+1:T} 
         result = zeros(xdim, numsamples);
         T = size(B,2);
-%         % JF: not working. This is a bug I never noticed, because at a
-%         time, we decided that the prediction (in
-%         convex_multi_view_model.m, line 300) should not use the "noise"
-%         for future prediction.
-%         for j = 1:madim
-%             idx = RarmaFcns.blockInd(j,xdim);
-%             Tidx = T:-1:max(T-numsamples+1,j);
-%             result(:,Tidx) = result(:,Tidx) + B(idx, Tidx-j+1);           
-%         end
+
         for j = 1:madim
             idx = RarmaFcns.blockInd(j,xdim);
             Tidx = numsamples:-1:max(1,numsamples-T+j);
@@ -115,8 +111,8 @@ function Xiterated = iterate_predict(Xstart, Epsilonstart, model, horizon, opts)
 % Epsilonstart can either be Zstart or the epsilon; this is
 % determined by the size of the matrix
     
-    if isempty(Epsilonstart) 
-        Xiterated = iterate_predict_ar(Xstart, model, horizon, opts);
+    if isempty(Epsilonstart)
+        Xiterated = RarmaFcns.iterate_predict_ar(Xstart, model, horizon, opts);
         return;
     end
     
